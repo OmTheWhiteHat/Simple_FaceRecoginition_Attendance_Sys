@@ -52,6 +52,8 @@ def recognize_faces():
         messagebox.showerror("Error", "Unable to access the webcam.")
         return
 
+    recognized_ids = set()  # To store already recognized student IDs during the session
+
     while is_running:
         ret, frame = cam.read()
         if not ret:
@@ -65,7 +67,10 @@ def recognize_faces():
             face_roi = gray[y:y + h, x:x + w]
             label, confidence = recognizer.predict(face_roi)
 
-            if confidence < 80:  # Adjust as needed
+            if confidence < 80:
+                if label not in recognized_ids:
+                    recognized_ids.add(label)  # Add this label to the recognized set
+
                 student_details = fetch_student_details(label)
                 if student_details:
                     student_id, name, father_name, roll_no, address, contact_number, email, course, semester, branch, date_of_birth, gender = student_details
@@ -75,7 +80,7 @@ def recognize_faces():
                     cv2.putText(frame, f"{name}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
                     cv2.putText(frame, f"{course}, Sem: {semester}", (x, y + h + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 255, 200), 2)
                 else:
-                    # No match found
+                    # If no match found
                     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
                     cv2.putText(frame, "Unknown", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
             else:

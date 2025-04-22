@@ -2,7 +2,7 @@ import cv2
 import os
 import numpy as np
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk, messagebox
 from tkinter import ttk
 import sqlite3
 from tkinter import PhotoImage
@@ -56,7 +56,33 @@ def insert_student_details(student_id, name, father_name, roll_no, address, cont
     except sqlite3.IntegrityError as e:
         messagebox.showerror("Database Error", f"Error inserting data: {e}")
 
+#update
+def update_student_details(student_id, name, father_name, roll_no, address, contact_number, email, course, semester, branch, date_of_birth, gender):
+    try:
+        conn = sqlite3.connect('students.db')
+        c = conn.cursor()
 
+        # Ensure the student exists before updating
+        c.execute("SELECT * FROM students WHERE student_id = ?", (student_id,))
+        if c.fetchone() is None:
+            messagebox.showwarning("Not Found", f"No student found with ID {student_id}")
+            return
+
+        # Update statement
+        c.execute('''
+            UPDATE students
+            SET name = ?, father_name = ?, roll_no = ?, address = ?, contact_number = ?, email = ?,
+                course = ?, semester = ?, branch = ?, date_of_birth = ?, gender = ?
+            WHERE student_id = ?
+        ''', (name, father_name, roll_no, address, contact_number, email,
+              course, semester, branch, date_of_birth, gender, student_id))
+
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", f"Student ID {student_id} updated successfully.")
+
+    except sqlite3.Error as e:
+        messagebox.showerror("Database Error", f"Error updating data: {e}")
 
 # Old function (conflict)
 # def fetch_student_details():
@@ -211,10 +237,8 @@ def capture_images(student_id):
 
     cam.release()
     cv2.destroyAllWindows()
-
-
-# Define the function that is called when the register button is clicked
-def on_register_button_click():
+#save 
+def on_save_button_click():
     student_id = student_id_entry.get()
     name = name_entry.get()
     father_name = father_name_entry.get()
@@ -230,131 +254,216 @@ def on_register_button_click():
 
     if not all([student_id, name, father_name, roll_no, address, contact_number, email, date_of_birth, gender, course, semester, branch]):
         messagebox.showwarning("Input Error", "Please fill in all the details.")
-    else:
-        insert_student_details(student_id, name, father_name, roll_no, address, contact_number, email, course, semester, branch, date_of_birth, gender)
-        capture_images(student_id)
-        train_model()
+        return
+
+    try:
+        # Check if student exists
+        conn = sqlite3.connect('students.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM students WHERE student_id = ?", (student_id,))
+        existing_student = cursor.fetchone()
+        conn.close()
+
+        if existing_student:
+            update_student_details(student_id, name, father_name, roll_no, address, contact_number, email, course, semester, branch, date_of_birth, gender)
+        else:
+            insert_student_details(student_id, name, father_name, roll_no, address, contact_number, email, course, semester, branch, date_of_birth, gender)
+
         update_student_table()
 
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to save or update student: {e}")
+        
+def reset_form_fields():
+    # Clear all entry fields
+    student_id_entry.delete(0, tk.END)
+    name_entry.delete(0, tk.END)
+    father_name_entry.delete(0, tk.END)
+    roll_no_entry.delete(0, tk.END)
+    gender_combobox.set('')
+    dob_entry.delete(0, tk.END)
+    address_entry.delete(0, tk.END)
+    contact_number_entry.delete(0, tk.END)
+    email_entry.delete(0, tk.END)
 
-# Setup Tkinter window
+    # Reset top filters
+    course_combobox.set('')
+    semester_combobox.set('')
+    branch_combobox.set('')
+
+    # Optionally set focus back to Student ID
+    student_id_entry.focus()
+
+
+def on_table_row_click(event):
+    selected_item = student_table.selection()
+    if not selected_item:
+        return
+    data = student_table.item(selected_item)['values']
+    
+    # Fill the form fields
+    student_id_entry.delete(0, tk.END)
+    student_id_entry.insert(0, data[0])
+    name_entry.delete(0, tk.END)
+    name_entry.insert(0, data[1])
+    father_name_entry.delete(0, tk.END)
+    father_name_entry.insert(0, data[2])
+    roll_no_entry.delete(0, tk.END)
+    roll_no_entry.insert(0, data[3])
+    address_entry.delete(0, tk.END)
+    address_entry.insert(0, data[4])
+    contact_number_entry.delete(0, tk.END)
+    contact_number_entry.insert(0, data[5])
+    email_entry.delete(0, tk.END)
+    email_entry.insert(0, data[6])
+    course_combobox.set(data[7])
+    semester_combobox.set(data[8])
+    branch_combobox.set(data[9])
+    dob_entry.delete(0, tk.END)
+    dob_entry.insert(0, data[10])
+    gender_combobox.set(data[11])
+
+    # Add similar lines for other fields if shown in the table
+
+#execute capture and train
+def execute_capture_and_train():
+    student_id = student_id_entry.get()
+    capture_images(student_id)
+    train_model()
+
+# Tkinter Window
+# Colors and styles
+PRIMARY_COLOR = "#3f00a3"
+SECONDARY_COLOR = "#F4F4F9"
+ACCENT_COLOR = "#4CAF50"
+TEXT_COLOR = "white"
+FONT = ("Segoe UI", 11)
+
+# Main Window
 window = tk.Tk()
 window.title("Student Registration System")
-window.geometry("1000x600")
-window.configure(bg='#F4F4F9')  # Set background color
+window.geometry("1200x700")
+window.configure(bg=SECONDARY_COLOR)
 
-# Create a PanedWindow to split the UI into two sections
-paned_window = tk.PanedWindow(window, orient="horizontal", bg='#F4F4F9')
+# PanedWindow
+paned_window = tk.PanedWindow(window, orient="horizontal", bg=SECONDARY_COLOR)
 paned_window.pack(fill=tk.BOTH, expand=True)
 
-# Create left panel for form inputs
-left_frame = tk.Frame(paned_window, bg='#F4F4F9')
-left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=20, pady=20)
+# Top frame for filters
+top_frame = tk.LabelFrame(window, text="Student Filter", font=("Segoe UI", 12, "bold"),
+                          bg=PRIMARY_COLOR, fg=TEXT_COLOR, bd=2, relief=tk.RIDGE)
+top_frame.pack(side=tk.TOP, fill=tk.X, padx=20, pady=10)
 
-# Add UI elements for student input with modern styling
-student_id_label = tk.Label(left_frame, text="Student ID", font=("Arial", 12), bg='#F4F4F9', fg='black')
-student_id_label.grid(row=0, column=0, sticky="w", pady=5)
-student_id_entry = tk.Entry(left_frame, font=("Arial", 12))
-student_id_entry.grid(row=0, column=1, pady=5)
+def add_combobox(frame, text, row, values):
+    label = tk.Label(frame, text=text, font=FONT, bg=PRIMARY_COLOR, fg=TEXT_COLOR)
+    label.grid(row=row, column=0, sticky="w", pady=5, padx=10)
+    combobox = ttk.Combobox(frame, font=FONT, values=values, state="readonly")
+    combobox.grid(row=row, column=1, pady=5, padx=10)
+    return combobox
 
-name_label = tk.Label(left_frame, text="Name", font=("Arial", 12), bg='#F4F4F9', fg='black')
-name_label.grid(row=1, column=0, sticky="w", pady=5)
-name_entry = tk.Entry(left_frame, font=("Arial", 12))
-name_entry.grid(row=1, column=1, pady=5)
+course_combobox = add_combobox(top_frame, "Course", 0, ["DIPLOMA"])
+semester_combobox = add_combobox(top_frame, "Semester", 1, [f"Semester {i}" for i in range(1, 7)])
+branch_combobox = add_combobox(top_frame, "Branch", 2, ["Computer Science", "Mechanical", "Civil", "Electrical", "Electronics"])
 
-father_name_label = tk.Label(left_frame, text="Father's Name", font=("Arial", 12), bg='#F4F4F9', fg='black')
-father_name_label.grid(row=2, column=0, sticky="w", pady=5)
-father_name_entry = tk.Entry(left_frame, font=("Arial", 12))
-father_name_entry.grid(row=2, column=1, pady=5)
+# Left Frame for form
+left_frame = tk.LabelFrame(paned_window, text="Student Registration", font=("Segoe UI", 12, "bold"),
+                           bg=SECONDARY_COLOR, fg="black", bd=2, relief=tk.RIDGE)
+paned_window.add(left_frame, minsize=500)
 
-roll_no_label = tk.Label(left_frame, text="Roll Number", font=("Arial", 12), bg='#F4F4F9', fg='black')
-roll_no_label.grid(row=3, column=0, sticky="w", pady=5)
-roll_no_entry = tk.Entry(left_frame, font=("Arial", 12))
-roll_no_entry.grid(row=3, column=1, pady=5)
+def add_entry(row, label_text, parent=left_frame, values=None):
+    label = tk.Label(parent, text=label_text, font=FONT, bg=SECONDARY_COLOR, fg='black')
+    label.grid(row=row, column=0, sticky="w", pady=8, padx=10)
+    if values:
+        entry = ttk.Combobox(parent, font=FONT, values=values, state="readonly")
+    else:
+        entry = tk.Entry(parent, font=FONT)
+    entry.grid(row=row, column=1, pady=8, padx=10, sticky="ew")
+    return entry
 
-address_label = tk.Label(left_frame, text="Address", font=("Arial", 12), bg='#F4F4F9', fg='black')
-address_label.grid(row=4, column=0, sticky="w", pady=5)
-address_entry = tk.Entry(left_frame, font=("Arial", 12))
-address_entry.grid(row=4, column=1, pady=5)
+student_id_entry = add_entry(0, "Student ID")
+name_entry = add_entry(1, "Name")
+father_name_entry = add_entry(2, "Father's Name")
+roll_no_entry = add_entry(3, "Roll Number")
+gender_combobox = add_entry(4, "Gender", values=["Male", "Female", "Other"])
+dob_entry = add_entry(5, "Date of Birth")
+address_entry = add_entry(6, "Address")
+contact_number_entry = add_entry(7, "Contact Number")
+email_entry = add_entry(8, "Email")
 
-# Contact Number
-contact_label = tk.Label(left_frame, text="Contact Number", font=("Arial", 12), bg='#F4F4F9', fg='black')
-contact_label.grid(row=8, column=0, sticky="w", pady=5)
-contact_number_entry = tk.Entry(left_frame, font=("Arial", 12))
-contact_number_entry.grid(row=8, column=1, pady=5)
+# Register and Exit buttons
+button_frame = tk.Frame(left_frame, bg=SECONDARY_COLOR)
+button_frame.grid(row=9, columnspan=2, pady=10, padx=20)
 
-# Email
-email_label = tk.Label(left_frame, text="Email", font=("Arial", 12), bg='#F4F4F9', fg='black')
-email_label.grid(row=9, column=0, sticky="w", pady=5)
-email_entry = tk.Entry(left_frame, font=("Arial", 12))
-email_entry.grid(row=9, column=1, pady=5)
+save_button = tk.Button(button_frame, text="Save", font=FONT, bg=ACCENT_COLOR, fg=TEXT_COLOR, width=12, command=on_save_button_click)
+save_button.pack(side=tk.LEFT, padx=5)
 
-# Date of Birth
-dob_label = tk.Label(left_frame, text="Date of Birth", font=("Arial", 12), bg='#F4F4F9', fg='black')
-dob_label.grid(row=10, column=0, sticky="w", pady=5)
-dob_entry = tk.Entry(left_frame, font=("Arial", 12))
-dob_entry.grid(row=10, column=1, pady=5)
+capture_button = tk.Button(button_frame, text="Capture", font=FONT, bg=ACCENT_COLOR, fg=TEXT_COLOR, width=12, command=execute_capture_and_train)
+capture_button.pack(side=tk.LEFT, padx=5)
 
-# Gender
-gender_label = tk.Label(left_frame, text="Gender", font=("Arial", 12), bg='#F4F4F9', fg='black')
-gender_label.grid(row=11, column=0, sticky="w", pady=5)
-gender_combobox = ttk.Combobox(left_frame, font=("Arial", 12), values=["Male", "Female", "Other"])
-gender_combobox.grid(row=11, column=1, pady=5)
+exit_button = tk.Button(button_frame, text="Exit", font=FONT, bg=ACCENT_COLOR, fg=TEXT_COLOR, width=12, command=window.destroy)
+exit_button.pack(side=tk.LEFT, padx=5)
 
-# Drop-down for Course
-course_label = tk.Label(left_frame, text="Course", font=("Arial", 12), bg='#F4F4F9', fg='black')
-course_label.grid(row=5, column=0, sticky="w", pady=5)
-course_combobox = ttk.Combobox(left_frame, font=("Arial", 12), values=["B.Tech", "M.Tech", "BCA", "MCA", "BBA", "MBA"])
-course_combobox.grid(row=5, column=1, pady=5)
+reset_button = tk.Button(button_frame, text="Reset", font=FONT, bg=ACCENT_COLOR, fg=TEXT_COLOR, width=12, command=reset_form_fields)
+reset_button.pack(side=tk.LEFT, padx=5)
 
-# Drop-down for Semester
-semester_label = tk.Label(left_frame, text="Semester", font=("Arial", 12), bg='#F4F4F9', fg='black')
-semester_label.grid(row=6, column=0, sticky="w", pady=5)
-semester_combobox = ttk.Combobox(left_frame, font=("Arial", 12), values=["Semester 1", "Semester 2", "Semester 3", "Semester 4", "Semester 5", "Semester 6", "Semester 7", "Semester 8"])
-semester_combobox.grid(row=6, column=1, pady=5)
 
-# Drop-down for Branch
-branch_label = tk.Label(left_frame, text="Branch", font=("Arial", 12), bg='#F4F4F9', fg='black')
-branch_label.grid(row=7, column=0, sticky="w", pady=5)
-branch_combobox = ttk.Combobox(left_frame, font=("Arial", 12), values=["Computer Science", "Mechanical", "Civil", "Electrical", "Electronics", "Biotech"])
-branch_combobox.grid(row=7, column=1, pady=5)
+# Right Frame for student table
+right_frame = tk.LabelFrame(paned_window, text="Registered Students", font=("Segoe UI", 12, "bold"),
+                            bg=SECONDARY_COLOR, fg="black", bd=2, relief=tk.RIDGE)
+paned_window.add(right_frame)
 
-# Register Button
-register_button = tk.Button(left_frame, text="Register", font=("Arial", 12), bg="#4CAF50", fg="white", command=on_register_button_click)
-register_button.grid(row=11, column=0, columnspan=2, pady=10)
+columns = ("Student ID", "Name", "Father's Name", "Roll No", "Address", "Course", "Semester", "Branch")
+student_table = ttk.Treeview(right_frame, columns=columns, show="headings")
+student_table.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+student_table.tag_configure('oddrow', background="#f2f2f2")
+student_table.tag_configure('evenrow', background="#ffffff")
+student_table.bind("<ButtonRelease-1>", on_table_row_click)
 
-exit_button = tk.Button(left_frame, text="Exit", font=("Arial", 12), bg="#4CAF50", fg="white", command=exit_program)
-exit_button.grid(row=11, column=1, columnspan=1, pady=10)
+student_data = fetch_all_student_details()
+for index, data in enumerate(student_data):
+    tag = 'evenrow' if index % 2 == 0 else 'oddrow'
+    student_table.insert("", "end", values=data, tags=(tag,))
 
-# Create a PanedWindow for the student table on the right
-right_frame = tk.Frame(paned_window, bg='#F4F4F9')
-right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-# Create student details table
-student_table = ttk.Treeview(right_frame, columns=("Student ID", "Name", "Father's Name", "Roll No", "Address", "Course", "Semester", "Branch"), show="headings")
-student_table.pack(fill=tk.BOTH, expand=True)
+for col in columns:
+    student_table.heading(col, text=col)
+    student_table.column(col, width=120, anchor="center")
 
-# Define headings for the student table
-student_table.heading("Student ID", text="Student ID")
-student_table.heading("Name", text="Name")
-student_table.heading("Father's Name", text="Father's Name")
-student_table.heading("Roll No", text="Roll No")
-student_table.heading("Address", text="Address")
-student_table.heading("Course", text="Course")
-student_table.heading("Semester", text="Semester")
-student_table.heading("Branch", text="Branch")
+# Optional: Add style to make Treeview look more modern
+# Treeview style customization
+style = ttk.Style()
+style.theme_use("default")  # You can try "clam", "alt", or "default"
+
+# Treeview heading style
+style.configure("Treeview.Heading",
+                font=("Segoe UI", 10, "bold"),
+                background="#3f00a3",  # heading background
+                foreground="white")    # heading text
+
+# Treeview row style
+style.configure("Treeview",
+                background="white",
+                foreground="black",
+                rowheight=30,
+                fieldbackground="white")
+
+# Selected row style
+style.map("Treeview",
+          background=[('selected', '#b3d9ff')],
+          foreground=[('selected', 'black')])
+
+
 
 # 🔧 Add this to show table data at startup
 update_student_table()
-fetch_all_student_details()
 # Status Label for capturing and training
 status_label = tk.Label(window, text="Status: Waiting for input...", font=("Arial", 12), bg='#F4F4F9', fg='black')
 status_label.pack(pady=10)
 
 # Add Scrollbar to the right of the table
-scrollbar = ttk.Scrollbar(right_frame, orient="vertical", command=student_table.yview)
-student_table.configure(yscroll=scrollbar.set)
-scrollbar.pack(side="right", fill="y")
+scrollbar = ttk.Scrollbar(right_frame, orient="horizontal", command=student_table.xview)
+student_table.configure(xscroll=scrollbar.set)
+scrollbar.pack(side="bottom", fill="x")
 
 
 # Run the Tkinter event loop
