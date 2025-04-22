@@ -6,6 +6,9 @@ from tkinter import messagebox
 from tkinter import ttk
 import sqlite3
 from tkinter import PhotoImage
+import re
+from hashlib import sha256
+
 
 def exit_program():
     window.quit()
@@ -17,17 +20,22 @@ def create_student_table():
 
     # Create the students table
     c.execute('''
-        CREATE TABLE IF NOT EXISTS students (
-            student_id varchar(10) PRIMARY KEY,
-            name TEXT,
-            father_name TEXT,
-            roll_no varchar(10) unique,
-            address TEXT,
-            course TEXT,
-            semester TEXT,
-            branch TEXT
-        )
-    ''')
+    CREATE TABLE IF NOT EXISTS students (
+        student_id VARCHAR(10) PRIMARY KEY,
+        name TEXT NOT NULL,
+        father_name TEXT,
+        roll_no VARCHAR(10) UNIQUE,
+        address TEXT,
+        contact_number VARCHAR(15),
+        email TEXT UNIQUE,
+        course TEXT,
+        semester TEXT,
+        branch TEXT,
+        date_of_birth TEXT,
+        gender TEXT
+    )
+''')
+
 
     conn.commit()
     conn.close()
@@ -35,14 +43,14 @@ def create_student_table():
 # Call the function to create the table when running the script for the first time
 create_student_table()
 
-def insert_student_details(student_id, name, father_name, roll_no, address, course, semester, branch):
+def insert_student_details(student_id, name, father_name, roll_no, address, contact_number, email, course, semester, branch, date_of_birth, gender):
     try:
         conn = sqlite3.connect('students.db')
         c = conn.cursor()
         c.execute('''
-            INSERT INTO students (student_id, name, father_name, roll_no, address, course, semester, branch)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (student_id, name, father_name, roll_no, address, course, semester, branch))
+            INSERT INTO students (student_id, name, father_name, roll_no, address, contact_number, email, course, semester, branch, date_of_birth, gender)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (student_id, name, father_name, roll_no, address, contact_number, email, course, semester, branch, date_of_birth, gender))
         conn.commit()
         conn.close()
     except sqlite3.IntegrityError as e:
@@ -73,33 +81,38 @@ def update_student_table():
     for student in students:
         student_table.insert("", "end", values=student)
 
-# Function to capture and train face images for a student
-def fetch_student_details(student_id):
-    """Fetch student details from the database based on student ID."""
-    try:
-        conn = sqlite3.connect("students.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM students WHERE student_id=?", (student_id,))
-        student = cursor.fetchone()
-        conn.close()
+# # Function to capture and train face images for a student
+# def fetch_student_details(student_id):
+#     """Fetch student details from the database based on student ID."""
+#     try:
+#         conn = sqlite3.connect("students.db")
+#         cursor = conn.cursor()
+#         cursor.execute("SELECT * FROM students WHERE student_id=?", (student_id,))
+#         student = cursor.fetchone()
+#         conn.close()
 
-        if student:
-            return {
-                "student_id": student[0],
-                "name": student[1],
-                "father_name": student[2],
-                "roll_no": student[3],
-                "address": student[4],
-                "course": student[5],
-                "semester": student[6],
-                "branch": student[7]
-            }
-        else:
-            return None
-    except Exception as e:
-        print(f"Error fetching student details: {e}")
-        return None
+#         if student:
+#             return {
+#                 "student_id": student[0],
+#                 "name": student[1],
+#                 "father_name": student[2],
+#                 "roll_no": student[3],
+#                 "address": student[4],
+#                 "course": student[5],
+#                 "semester": student[6],
+#                 "branch": student[7]
+#             }
+#         else:
+#             return None
+#     except Exception as e:
+#         print(f"Error fetching student details: {e}")
+#         return None
 # train model
+
+def string_to_int_id(s):
+    """Converts a string ID into a unique integer using hashing."""
+    return int(sha256(s.encode('utf-8')).hexdigest(), 16) % (10**8)
+
 def train_model():
     print("[INFO] Starting training...")
     recognizer = cv2.face.LBPHFaceRecognizer_create()
@@ -115,14 +128,17 @@ def train_model():
     for folder_name in os.listdir(base_path):
         folder_path = os.path.join(base_path, folder_name)
 
+        # Skip if not a directory
         if not os.path.isdir(folder_path):
             continue
 
-        try:
-            student_id = int(folder_name)
-        except ValueError:
-            print(f"[WARNING] Skipping non-numeric folder: {folder_name}")
+        # Skip folders with spaces or invalid characters
+        if " " in folder_name or not re.match(r"^[\w-]+$", folder_name):
+            print(f"[WARNING] Skipping invalid folder: {folder_name}")
             continue
+
+        student_id = folder_name
+        int_id = string_to_int_id(student_id)
 
         for filename in os.listdir(folder_path):
             img_path = os.path.join(folder_path, filename)
@@ -140,7 +156,7 @@ def train_model():
 
             for (x, y, w, h) in faces:
                 face_samples.append(img[y:y+h, x:x+w])
-                ids.append(student_id)
+                ids.append(int_id)
 
     if len(face_samples) == 0:
         print("[ERROR] No valid training images found.")
@@ -151,7 +167,6 @@ def train_model():
     recognizer.train(face_samples, np.array(ids))
     recognizer.save("trainer.yml")
     print("[INFO] Trainer model saved to trainer.yml.")
-
 
 def capture_images(student_id):
     cam = cv2.VideoCapture(0)
@@ -205,21 +220,22 @@ def on_register_button_click():
     father_name = father_name_entry.get()
     roll_no = roll_no_entry.get()
     address = address_entry.get()
+    contact_number = contact_number_entry.get()
+    email = email_entry.get()
+    date_of_birth = dob_entry.get()
+    gender = gender_combobox.get()
     course = course_combobox.get()
     semester = semester_combobox.get()
     branch = branch_combobox.get()
 
-    if student_id == "" or name == "" or father_name == "" or roll_no == "" or address == "" or course == "" or semester == "" or branch == "":
+    if not all([student_id, name, father_name, roll_no, address, contact_number, email, date_of_birth, gender, course, semester, branch]):
         messagebox.showwarning("Input Error", "Please fill in all the details.")
     else:
-        # Insert student details into the database
-        insert_student_details(student_id, name, father_name, roll_no, address, course, semester, branch)
-        
-        # Capture and train face
+        insert_student_details(student_id, name, father_name, roll_no, address, contact_number, email, course, semester, branch, date_of_birth, gender)
         capture_images(student_id)
         train_model()
-        # Update the student table with new data
         update_student_table()
+
 
 # Setup Tkinter window
 window = tk.Tk()
@@ -261,6 +277,30 @@ address_label.grid(row=4, column=0, sticky="w", pady=5)
 address_entry = tk.Entry(left_frame, font=("Arial", 12))
 address_entry.grid(row=4, column=1, pady=5)
 
+# Contact Number
+contact_label = tk.Label(left_frame, text="Contact Number", font=("Arial", 12), bg='#F4F4F9', fg='black')
+contact_label.grid(row=8, column=0, sticky="w", pady=5)
+contact_number_entry = tk.Entry(left_frame, font=("Arial", 12))
+contact_number_entry.grid(row=8, column=1, pady=5)
+
+# Email
+email_label = tk.Label(left_frame, text="Email", font=("Arial", 12), bg='#F4F4F9', fg='black')
+email_label.grid(row=9, column=0, sticky="w", pady=5)
+email_entry = tk.Entry(left_frame, font=("Arial", 12))
+email_entry.grid(row=9, column=1, pady=5)
+
+# Date of Birth
+dob_label = tk.Label(left_frame, text="Date of Birth", font=("Arial", 12), bg='#F4F4F9', fg='black')
+dob_label.grid(row=10, column=0, sticky="w", pady=5)
+dob_entry = tk.Entry(left_frame, font=("Arial", 12))
+dob_entry.grid(row=10, column=1, pady=5)
+
+# Gender
+gender_label = tk.Label(left_frame, text="Gender", font=("Arial", 12), bg='#F4F4F9', fg='black')
+gender_label.grid(row=11, column=0, sticky="w", pady=5)
+gender_combobox = ttk.Combobox(left_frame, font=("Arial", 12), values=["Male", "Female", "Other"])
+gender_combobox.grid(row=11, column=1, pady=5)
+
 # Drop-down for Course
 course_label = tk.Label(left_frame, text="Course", font=("Arial", 12), bg='#F4F4F9', fg='black')
 course_label.grid(row=5, column=0, sticky="w", pady=5)
@@ -281,10 +321,10 @@ branch_combobox.grid(row=7, column=1, pady=5)
 
 # Register Button
 register_button = tk.Button(left_frame, text="Register", font=("Arial", 12), bg="#4CAF50", fg="white", command=on_register_button_click)
-register_button.grid(row=8, column=0, columnspan=2, pady=10)
+register_button.grid(row=11, column=0, columnspan=2, pady=10)
 
 exit_button = tk.Button(left_frame, text="Exit", font=("Arial", 12), bg="#4CAF50", fg="white", command=exit_program)
-exit_button.grid(row=8, column=1, columnspan=1, pady=10)
+exit_button.grid(row=11, column=1, columnspan=1, pady=10)
 
 # Create a PanedWindow for the student table on the right
 right_frame = tk.Frame(paned_window, bg='#F4F4F9')
@@ -306,7 +346,7 @@ student_table.heading("Branch", text="Branch")
 
 # 🔧 Add this to show table data at startup
 update_student_table()
-
+fetch_all_student_details()
 # Status Label for capturing and training
 status_label = tk.Label(window, text="Status: Waiting for input...", font=("Arial", 12), bg='#F4F4F9', fg='black')
 status_label.pack(pady=10)
