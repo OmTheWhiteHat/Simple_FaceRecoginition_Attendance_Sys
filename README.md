@@ -1,0 +1,2 @@
+# Simple_FaceRecoginition_Attendance_Sys
+Simple Face Recongination based Attendance System
