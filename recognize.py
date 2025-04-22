@@ -76,12 +76,13 @@ def recognize_faces():
                     student_id, name, father_name, roll_no, address, contact_number, email, course, semester, branch, date_of_birth, gender = student_details
 
                     # Draw green rectangle and info
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (118, 8, 252), 2)
                     cv2.putText(frame, f"{name}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
-                    cv2.putText(frame, f"{course}, Sem: {semester}", (x, y + h + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 255, 200), 2)
+                    cv2.putText(frame, f"{roll_no} | Sem: {semester}", (x, y + h + 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (93, 0, 255), 2)
+                    cv2.putText(frame, f"Branch: {branch}", (x, y + h + 50), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (215, 215, 215), 2)
                 else:
                     # If no match found
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (100, 149, 237), 2)
                     cv2.putText(frame, "Unknown", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
             else:
                 # Confidence too low

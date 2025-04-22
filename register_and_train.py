@@ -362,7 +362,7 @@ def add_combobox(frame, text, row, values):
     return combobox
 
 course_combobox = add_combobox(top_frame, "Course", 0, ["DIPLOMA"])
-semester_combobox = add_combobox(top_frame, "Semester", 1, [f"Semester {i}" for i in range(1, 7)])
+semester_combobox = add_combobox(top_frame, "Semester", 1, [f"{i}" for i in range(1, 7)])
 branch_combobox = add_combobox(top_frame, "Branch", 2, ["Computer Science", "Mechanical", "Civil", "Electrical", "Electronics"])
 
 # Left Frame for form
